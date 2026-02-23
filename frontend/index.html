@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GitHub Repo Summarizer</title>
+  <meta name="description"
+    content="AI-powered GitHub repository summarizer. Paste any GitHub URL and get an instant summary of what the project does, its tech stack, and structure." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: rgba(255, 255, 255, 0.05);
+      --surface-hover: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --accent3: #06b6d4;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --success: #10b981;
+      --error: #ef4444;
+      --radius: 16px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* Animated gradient orbs */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.18;
+      animation: drift 12s ease-in-out infinite alternate;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-orb-1 {
+      width: 500px;
+      height: 500px;
+      background: var(--accent);
+      top: -100px;
+      left: -100px;
+      animation-delay: 0s;
+    }
+
+    .bg-orb-2 {
+      width: 400px;
+      height: 400px;
+      background: var(--accent2);
+      top: 30%;
+      right: -120px;
+      animation-delay: 3s;
+    }
+
+    .bg-orb-3 {
+      width: 350px;
+      height: 350px;
+      background: var(--accent3);
+      bottom: -80px;
+      left: 30%;
+      animation-delay: 6s;
+    }
+
+    @keyframes drift {
+      from {
+        transform: translate(0, 0) scale(1);
+      }
+
+      to {
+        transform: translate(30px, 20px) scale(1.07);
+      }
+    }
+
+    /* Grid pattern overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ── */
+    main {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 780px;
+      padding: 60px 24px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 100px;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      background: rgba(99, 102, 241, 0.12);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: #a5b4fc;
+      margin-bottom: 20px;
+    }
+
+    .badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #6366f1;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+      }
+
+      50% {
+        box-shadow: 0 0 0 5px rgba(99, 102, 241, 0);
+      }
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #f1f5f9 30%, #a5b4fc 70%, #67e8f9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ── Search card ── */
+    .search-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.2s;
+    }
+
+    .search-card:focus-within {
+      border-color: rgba(99, 102, 241, 0.5);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .github-icon {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      fill: var(--muted);
+    }
+
+    #url-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      caret-color: var(--accent);
+    }
+
+    #url-input::placeholder {
+      color: var(--muted);
+    }
+
+    #submit-btn {
+      flex-shrink: 0;
+      padding: 10px 22px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    }
+
+    #submit-btn:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+    }
+
+    #submit-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    #submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .hint span {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .hint span:hover {
+      color: #a5b4fc;
+    }
+
+    /* ── Loading ── */
+    #loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 40px;
+      text-align: center;
+    }
+
+    #loading.visible {
+      display: flex;
+    }
+
+    .spinner-ring {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(99, 102, 241, 0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .step {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.4s, transform 0.4s;
+    }
+
+    .step.active {
+      opacity: 1;
+      transform: translateY(0);
+      color: #a5b4fc;
+    }
+
+    .step.done {
+      opacity: 0.5;
+    }
+
+    .step-icon {
+      font-size: 14px;
+    }
+
+    /* ── Error banner ── */
+    #error-banner {
+      display: none;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px 20px;
+      border-radius: var(--radius);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      font-size: 14px;
+      color: #fca5a5;
+      animation: slideIn 0.3s ease;
+    }
+
+    #error-banner.visible {
+      display: flex;
+    }
+
+    /* ── Result card ── */
+    #result {
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+      animation: slideIn 0.4s ease;
+    }
+
+    #result.visible {
+      display: flex;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .repo-name {
+      font-size: 20px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .repo-name a {
+      color: var(--text);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .repo-name a:hover {
+      color: #a5b4fc;
+    }
+
+    .external-icon {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .section-card:hover {
+      border-color: rgba(99, 102, 241, 0.25);
+      background: var(--surface-hover);
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .summary-text {
+      font-size: 15px;
+      line-height: 1.75;
+      color: #cbd5e1;
+    }
+
+    /* Tech chips */
+    .tech-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .tech-chip {
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: default;
+      transition: transform 0.15s, box-shadow 0.15s;
+      opacity: 0;
+      transform: translateY(6px) scale(0.95);
+      animation: chipIn 0.3s ease forwards;
+    }
+
+    .tech-chip:hover {
+      transform: translateY(-2px) scale(1.04);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    @keyframes chipIn {
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Color variants based on category */
+    .chip-lang {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.35);
+      color: #a5b4fc;
+    }
+
+    .chip-tool {
+      background: rgba(6, 182, 212, 0.12);
+      border-color: rgba(6, 182, 212, 0.3);
+      color: #67e8f9;
+    }
+
+    .chip-lib {
+      background: rgba(139, 92, 246, 0.12);
+      border-color: rgba(139, 92, 246, 0.3);
+      color: #c4b5fd;
+    }
+
+    .chip-test {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+    }
+
+    .structure-text {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #94a3b8;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Footer */
+    footer {
+      position: relative;
+      z-index: 1;
+      padding: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    footer a {
+      color: #6366f1;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+
+  <main>
+    <!-- Header -->
+    <header>
+      <h1>GitHub Repo Summarizer</h1>
+      <p class="subtitle">Drop any GitHub URL and instantly understand what the project does, its tech stack, and how
+        it's organised.</p>
+    </header>
+
+    <!-- Search -->
+    <div class="search-card">
+      <div class="input-row">
+        <svg class="github-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+        </svg>
+        <input id="url-input" type="url" placeholder="https://github.com/owner/repository" autocomplete="off"
+          spellcheck="false" />
+        <button id="submit-btn">Summarize →</button>
+      </div>
+      <div class="hint">
+        <span onclick="setUrl('https://github.com/psf/requests')">try: psf/requests</span>
+        <span onclick="setUrl('https://github.com/fastapi/fastapi')">try: fastapi/fastapi</span>
+        <span onclick="setUrl('https://github.com/pallets/flask')">try: pallets/flask</span>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading">
+      <div class="spinner-ring"></div>
+      <div class="loading-steps">
+        <div class="step" id="step-1"><span class="step-icon">🔍</span> Fetching repository metadata…</div>
+        <div class="step" id="step-2"><span class="step-icon">📂</span> Analysing file tree & dependencies…</div>
+        <div class="step" id="step-3"><span class="step-icon">🧠</span> Generating AI summary…</div>
+        <div class="step" id="step-4"><span class="step-icon">✅</span> Filtering technologies against evidence…</div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="error-banner">
+      <span style="font-size:18px">⚠️</span>
+      <span id="error-text"></span>
+    </div>
+
+    <!-- Result -->
+    <div id="result">
+      <div class="result-header">
+        <div class="repo-name" id="result-repo-name"></div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-label">Summary</div>
+        <p class="summary-text" id="result-summary"></p>
+      </div>
+
+      <div class="section-card">
+        <div class="section-label">Tech Stack</div>
+        <div class="tech-grid" id="result-tech"></div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-label">Project Structure</div>
+        <p class="structure-text" id="result-structure"></p>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Built with FastAPI ·
+    <a href="https://github.com/shashanksuresh18/github-repo-summarizer-api" target="_blank">View Source</a>
+  </footer>
+
+  <script>
+    const API_BASE = window.location.origin;
+
+    const input = document.getElementById('url-input');
+    const btn = document.getElementById('submit-btn');
+
+    function setUrl(url) {
+      input.value = url;
+      input.focus();
+    }
+
+    btn.addEventListener('click', runSummarize);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') runSummarize(); });
+
+    function showSection(id) {
+      ['loading', 'error-banner', 'result'].forEach(s => {
+        const el = document.getElementById(s);
+        el.classList.remove('visible');
+        if (s === 'loading') el.style.display = '';
+      });
+      document.getElementById(id).classList.add('visible');
+      if (id === 'loading') document.getElementById('loading').style.display = 'flex';
+    }
+
+    // Stepped loading animation
+    let stepTimer = null;
+    function animateSteps() {
+      const steps = ['step-1', 'step-2', 'step-3', 'step-4'];
+      steps.forEach(s => document.getElementById(s).className = 'step');
+
+      let i = 0;
+      function next() {
+        if (i < steps.length) {
+          if (i > 0) document.getElementById(steps[i - 1]).classList.add('done');
+          document.getElementById(steps[i]).classList.add('active');
+          i++;
+          stepTimer = setTimeout(next, 2200);
+        }
+      }
+      next();
+    }
+
+    function clearStepTimer() {
+      if (stepTimer) clearTimeout(stepTimer);
+    }
+
+    // Colour chips by category heuristic
+    const LANG_KEYWORDS = ['python', 'javascript', 'typescript', 'go', 'rust', 'java', 'c++', 'c#', 'ruby', 'swift', 'kotlin', 'r', 'php', 'scala', 'html', 'css'];
+    const TEST_KEYWORDS = ['pytest', 'jest', 'mocha', 'unittest', 'vitest', 'rspec', 'junit', 'testify'];
+    const TOOL_KEYWORDS = ['docker', 'webpack', 'vite', 'git', 'make', 'gradle', 'maven', 'pip', 'npm', 'yarn', 'pnpm', 'uv', 'uvicorn', 'fastapi', 'flask', 'django', 'express', 'next'];
+
+    function chipClass(tech) {
+      const t = tech.toLowerCase();
+      if (LANG_KEYWORDS.some(k => t.includes(k))) return 'chip-lang';
+      if (TEST_KEYWORDS.some(k => t.includes(k))) return 'chip-test';
+      if (TOOL_KEYWORDS.some(k => t.includes(k))) return 'chip-tool';
+      return 'chip-lib';
+    }
+
+    async function runSummarize() {
+      const url = input.value.trim();
+      if (!url) { input.focus(); return; }
+
+      btn.disabled = true;
+      showSection('loading');
+      animateSteps();
+
+      try {
+        const res = await fetch(`${API_BASE}/summarize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ github_url: url }),
+        });
+
+        clearStepTimer();
+        const data = await res.json();
+
+        if (!res.ok || data.status === 'error') {
+          showError(data.message || `HTTP ${res.status}`);
+        } else {
+          renderResult(url, data);
+        }
+      } catch (err) {
+        clearStepTimer();
+        showError('Could not reach the API server. Make sure the backend is running on port 8001.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('error-text').textContent = msg;
+      showSection('error-banner');
+    }
+
+    function renderResult(url, data) {
+      // Repo name from URL
+      const match = url.match(/github\.com\/([^/]+\/[^/?\s.#]+)/);
+      const repoPath = match ? match[1] : url;
+      document.getElementById('result-repo-name').innerHTML =
+        `<a href="${url}" target="_blank" rel="noopener">📦 ${repoPath}</a> <span class="external-icon">↗</span>`;
+
+      document.getElementById('result-summary').textContent = data.summary || '—';
+      document.getElementById('result-structure').textContent = data.structure || '—';
+
+      const techEl = document.getElementById('result-tech');
+      techEl.innerHTML = '';
+      (data.technologies || []).forEach((t, idx) => {
+        const chip = document.createElement('span');
+        chip.className = `tech-chip ${chipClass(t)}`;
+        chip.textContent = t;
+        chip.style.animationDelay = `${idx * 55}ms`;
+        techEl.appendChild(chip);
+      });
+
+      showSection('result');
+    }
+  </script>
+</body>
+
+</html>

@@ -13,7 +13,8 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, HTMLResponse
 
 from app.cache import TTLCache
 from app.github_client import (
@@ -95,6 +96,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── CORS ───────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # ── Middleware: request_id + timing ────────────────────────────
 @app.middleware("http")
@@ -120,6 +130,18 @@ def _error_response(status: int, message: str) -> JSONResponse:
 
 
 # ── Endpoints ──────────────────────────────────────────────────
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    """Serve the UI at the root path."""
+    import os
+    ui_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "index.html")
+    try:
+        with open(ui_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<h1>GitHub Repo Summarizer API</h1><p>UI file not found at /frontend/index.html. Use POST /summarize to get started.</p>"
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
